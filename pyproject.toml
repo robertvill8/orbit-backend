@@ -1,0 +1,162 @@
+[tool.poetry]
+name = "agent-cockpit-backend"
+version = "1.0.0"
+description = "AI Agent Cockpit Backend - Intelligent orchestration layer for proactive personal assistant"
+authors = ["Backend Team <backend@yourdomain.com>"]
+readme = "README.md"
+python = "^3.11"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+# Web Framework
+fastapi = "0.115.0"
+uvicorn = {extras = ["standard"], version = "0.30.0"}
+python-multipart = "0.0.12"
+
+# Database & ORM
+sqlalchemy = {extras = ["asyncio"], version = "2.0.35"}
+asyncpg = "0.29.0"
+alembic = "1.13.3"
+psycopg2-binary = "2.9.9"
+
+# Caching & Message Queue
+redis = {extras = ["hiredis"], version = "5.2.0"}
+
+# Validation & Serialization
+pydantic = "2.10.5"
+pydantic-settings = "2.7.0"
+
+# LLM Integration
+openai = "1.54.0"
+anthropic = "0.39.0"
+tiktoken = "0.8.0"
+
+# HTTP Client
+httpx = "0.28.1"
+tenacity = "9.0.0"
+
+# Authentication & Security
+python-jose = {extras = ["cryptography"], version = "3.3.0"}
+passlib = {extras = ["bcrypt"], version = "1.7.4"}
+python-dotenv = "1.0.1"
+
+# Background Tasks
+celery = "5.4.0"
+flower = "2.0.1"
+
+# Monitoring & Logging
+structlog = "24.4.0"
+prometheus-fastapi-instrumentator = "7.0.0"
+sentry-sdk = {extras = ["fastapi"], version = "2.18.0"}
+
+# Utilities
+python-dateutil = "2.9.0"
+pytz = "2024.2"
+
+[tool.poetry.group.dev.dependencies]
+# Testing
+pytest = "8.3.4"
+pytest-asyncio = "0.24.0"
+pytest-cov = "6.0.0"
+pytest-mock = "3.14.0"
+faker = "33.1.0"
+
+# Linting & Formatting
+black = "24.10.0"
+isort = "5.13.2"
+flake8 = "7.1.1"
+mypy = "1.13.0"
+pylint = "3.3.2"
+
+# Type Stubs
+types-redis = "4.6.0.20240425"
+types-pytz = "2024.2.0.20240913"
+
+# Development Tools
+ipython = "8.30.0"
+pre-commit = "4.0.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | alembic/versions
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+known_first_party = ["app"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "celery.*",
+    "flower.*",
+    "prometheus_fastapi_instrumentator.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-fail-under=90",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/alembic/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]

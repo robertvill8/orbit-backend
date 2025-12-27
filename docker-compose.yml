@@ -1,0 +1,281 @@
+# ============================================================================
+# DOCKER COMPOSE CONFIGURATION FOR ORBIT V3 BACKEND
+# ============================================================================
+# Services:
+#   - postgres: PostgreSQL 16 with pgvector extension
+#   - redis: Redis 7 for caching and pub/sub
+#   - backend: FastAPI application
+#
+# Networks:
+#   - orbit_network: Bridge network for inter-service communication
+#
+# Volumes:
+#   - postgres_data: Persistent PostgreSQL data
+#   - redis_data: Persistent Redis data
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # POSTGRESQL DATABASE
+  # ==========================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: orbit_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orbit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbit_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-orbit_db}
+      # Performance tuning for development
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: Custom PostgreSQL configuration
+      # - ./postgres.conf:/etc/postgresql/postgresql.conf
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orbit} -d ${POSTGRES_DB:-orbit_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - orbit_network
+
+    # Resource limits (adjust based on your system)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ==========================================================================
+  # REDIS CACHE & PUB/SUB
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: orbit_redis
+    restart: unless-stopped
+
+    # Enable AOF persistence for data durability
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+    volumes:
+      - redis_data:/data
+      # Optional: Custom Redis configuration
+      # - ./redis.conf:/usr/local/etc/redis/redis.conf
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+    networks:
+      - orbit_network
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # ==========================================================================
+  # FASTAPI BACKEND APPLICATION
+  # ==========================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Use target 'runtime' from multi-stage build
+      target: runtime
+      # Build args for customization
+      args:
+        PYTHON_VERSION: 3.11
+
+    container_name: orbit_backend
+    restart: unless-stopped
+
+    # Override CMD for development (use --reload)
+    # For production, comment out this line to use Dockerfile CMD
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+    environment:
+      # Application Settings
+      APP_NAME: ${APP_NAME:-Orbit V3 Backend}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Server Configuration
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8000}
+      WORKERS: ${WORKERS:-4}
+
+      # Database Configuration (use service names for Docker network DNS)
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-orbit}:${POSTGRES_PASSWORD:-orbit_dev_password}@postgres:5432/${POSTGRES_DB:-orbit_db}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-20}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-10}
+      DATABASE_ECHO: ${DATABASE_ECHO:-false}
+
+      # Redis Configuration (use service name for Docker network DNS)
+      REDIS_URL: redis://redis:6379/0
+      REDIS_MAX_CONNECTIONS: ${REDIS_MAX_CONNECTIONS:-50}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-86400}
+      MESSAGE_CACHE_TTL_SECONDS: ${MESSAGE_CACHE_TTL_SECONDS:-3600}
+
+      # LLM Provider Settings
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      ANTHROPIC_MAX_TOKENS: ${ANTHROPIC_MAX_TOKENS:-4096}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4-turbo-preview}
+
+      # n8n Integration
+      N8N_BASE_URL: ${N8N_BASE_URL:-https://n8n-wsex.sliplane.app}
+      N8N_WEBHOOK_EMAIL_READ: ${N8N_WEBHOOK_EMAIL_READ:-/webhook/email-read}
+      N8N_WEBHOOK_CALENDAR_CREATE: ${N8N_WEBHOOK_CALENDAR_CREATE:-/webhook/calendar-create}
+      N8N_WEBHOOK_OCR_PROCESS: ${N8N_WEBHOOK_OCR_PROCESS:-/webhook/ocr-process}
+      N8N_API_KEY: ${N8N_API_KEY:-}
+      N8N_TIMEOUT_SECONDS: ${N8N_TIMEOUT_SECONDS:-30}
+      N8N_MAX_RETRIES: ${N8N_MAX_RETRIES:-3}
+
+      # Authentication & Security
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-10080}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+
+      # WebSocket Settings
+      WS_HEARTBEAT_INTERVAL: ${WS_HEARTBEAT_INTERVAL:-30}
+      WS_MAX_CONNECTIONS_PER_SESSION: ${WS_MAX_CONNECTIONS_PER_SESSION:-5}
+      WS_CONNECTION_TIMEOUT: ${WS_CONNECTION_TIMEOUT:-300}
+
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-100}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-20}
+
+      # Monitoring & Observability
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-true}
+
+      # Feature Flags
+      FEATURE_VOICE_INPUT: ${FEATURE_VOICE_INPUT:-true}
+      FEATURE_PROACTIVE_NOTIFICATIONS: ${FEATURE_PROACTIVE_NOTIFICATIONS:-true}
+      FEATURE_BACKGROUND_TASKS: ${FEATURE_BACKGROUND_TASKS:-false}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    volumes:
+      # Mount source code for hot reload in development
+      # COMMENT OUT FOR PRODUCTION DEPLOYMENT
+      - ./app:/app/app:ro
+      - ./alembic:/app/alembic
+      - ./tests:/app/tests:ro
+      # Mount for persistent logs
+      - backend_logs:/app/logs
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - orbit_network
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+# ============================================================================
+# NAMED VOLUMES FOR DATA PERSISTENCE
+# ============================================================================
+volumes:
+  postgres_data:
+    driver: local
+    # Optional: specify custom mount point
+    # driver_opts:
+    #   type: none
+    #   device: /path/to/postgres/data
+    #   o: bind
+
+  redis_data:
+    driver: local
+
+  backend_logs:
+    driver: local
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+networks:
+  orbit_network:
+    driver: bridge
+    # Optional: Custom subnet configuration
+    # ipam:
+    #   config:
+    #     - subnet: 172.25.0.0/16
+
+# ============================================================================
+# USAGE INSTRUCTIONS
+# ============================================================================
+# Development:
+#   docker-compose up -d                  # Start all services in background
+#   docker-compose logs -f backend        # Follow backend logs
+#   docker-compose exec backend bash      # Access backend container shell
+#   docker-compose down                   # Stop all services
+#   docker-compose down -v                # Stop and remove volumes (CAUTION: deletes data)
+#
+# Production:
+#   1. Comment out volume mounts for hot reload (./app, ./alembic, ./tests)
+#   2. Comment out --reload flag in backend command
+#   3. Set ENVIRONMENT=production in .env
+#   4. Set DEBUG=false in .env
+#   5. Use docker-compose up -d --build
+#
+# Database Migrations:
+#   docker-compose exec backend alembic upgrade head
+#   docker-compose exec backend alembic revision --autogenerate -m "description"
+#
+# Scaling:
+#   docker-compose up -d --scale backend=3  # Run 3 backend instances
+#   (Requires load balancer like Nginx/Traefik in front)
+# ============================================================================
