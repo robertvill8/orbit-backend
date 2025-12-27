@@ -76,8 +76,11 @@ def run_migrations_online() -> None:
     from app.core.config import settings
 
     # Override the sqlalchemy.url from config with environment variable
+    # Alembic uses synchronous operations, so replace asyncpg with psycopg2
+    sync_database_url = settings.database_url.replace("+asyncpg", "+psycopg2")
+
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = settings.database_url
+    configuration["sqlalchemy.url"] = sync_database_url
 
     connectable = engine_from_config(
         configuration,
