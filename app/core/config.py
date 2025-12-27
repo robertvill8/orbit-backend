@@ -171,6 +171,19 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """
+        Ensure DATABASE_URL uses asyncpg driver for async SQLAlchemy.
+        Railway provides postgresql:// URLs which default to psycopg2 (sync).
+        This validator transforms them to postgresql+asyncpg:// for async compatibility.
+        """
+        if v.startswith("postgresql://") and "+asyncpg" not in v:
+            # Transform postgresql:// to postgresql+asyncpg://
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

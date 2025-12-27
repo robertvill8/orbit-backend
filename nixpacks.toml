@@ -1,9 +1,5 @@
 # Railway Nixpacks configuration
-# Fix DATABASE_URL to use asyncpg driver for async SQLAlchemy
-
-[phases.setup]
-nixPkgs = ["python311", "postgresql"]
+# Run database migrations on startup before starting the server
 
 [start]
-# Transform DATABASE_URL from postgresql:// to postgresql+asyncpg://
-cmd = "sh -c 'export DATABASE_URL=$(echo $DATABASE_URL | sed \"s/postgresql:\\/\\//postgresql+asyncpg:\\/\\//\") && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT'"
+cmd = "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
