@@ -1,4 +1,9 @@
-[variables]
-# Railway automatically provides DATABASE_URL but it uses psycopg2
-# We need to modify it to use asyncpg for async SQLAlchemy
-DATABASE_URL = "${{Postgres.DATABASE_PRIVATE_URL}}"
+# Railway Nixpacks configuration
+# Fix DATABASE_URL to use asyncpg driver for async SQLAlchemy
+
+[phases.setup]
+nixPkgs = ["python311", "postgresql"]
+
+[start]
+# Transform DATABASE_URL from postgresql:// to postgresql+asyncpg://
+cmd = "sh -c 'export DATABASE_URL=$(echo $DATABASE_URL | sed \"s/postgresql:\\/\\//postgresql+asyncpg:\\/\\//\") && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT'"
