@@ -4,6 +4,9 @@
 
 set -e
 
+# Add current directory to Python path so imports work
+export PYTHONPATH=/app:$PYTHONPATH
+
 echo "Running database migrations..."
 alembic upgrade head
 
