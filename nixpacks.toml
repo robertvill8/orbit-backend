@@ -1,0 +1,4 @@
+[variables]
+# Railway automatically provides DATABASE_URL but it uses psycopg2
+# We need to modify it to use asyncpg for async SQLAlchemy
+DATABASE_URL = "${{Postgres.DATABASE_PRIVATE_URL}}"
