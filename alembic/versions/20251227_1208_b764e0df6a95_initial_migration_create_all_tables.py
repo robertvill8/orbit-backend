@@ -20,6 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Enable pgvector extension for vector embeddings
+    op.execute('CREATE EXTENSION IF NOT EXISTS vector')
+
     # Create schemas first
     op.execute('CREATE SCHEMA IF NOT EXISTS users')
     op.execute('CREATE SCHEMA IF NOT EXISTS activities')
