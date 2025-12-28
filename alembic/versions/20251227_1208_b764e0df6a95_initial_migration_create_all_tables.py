@@ -10,7 +10,6 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-import pgvector.sqlalchemy
 
 # revision identifiers, used by Alembic.
 revision: str = 'b764e0df6a95'
@@ -20,9 +19,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Enable pgvector extension for vector embeddings
-    op.execute('CREATE EXTENSION IF NOT EXISTS vector')
-
     # Create schemas first
     op.execute('CREATE SCHEMA IF NOT EXISTS users')
     op.execute('CREATE SCHEMA IF NOT EXISTS activities')
@@ -114,7 +110,6 @@ def upgrade() -> None:
     sa.Column('summary_short', sa.Text(), nullable=True),
     sa.Column('summary_medium', sa.Text(), nullable=True),
     sa.Column('summary_long', sa.Text(), nullable=True),
-    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=1536), nullable=True),
     sa.Column('processing_status', sa.String(length=20), nullable=False),
     sa.Column('processing_error', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
@@ -198,7 +193,6 @@ def upgrade() -> None:
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('entity_type', sa.String(length=20), nullable=False),
     sa.Column('entity_id', sa.UUID(), nullable=False),
-    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=1536), nullable=True),
     sa.Column('text_content', sa.Text(), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.CheckConstraint("entity_type IN ('email', 'task', 'calendar', 'document')", name='check_entity_type'),
